@@ -1,0 +1,195 @@
+# YouTube2Podcast Configuration
+# Конфигурация источников для загрузки аудио и создания RSS подкастов
+
+# Глобальные настройки
+global:
+  check_interval: 10  # Интервал проверки в минутах
+  max_videos: 5      # Количество последних видео для проверки
+  language: "ru"     # Язык RSS
+  timezone: "Europe/Moscow"
+
+# Подписки для загрузки
+subscriptions:
+  # Подписка "Новости и политика"
+  news_politics:
+    enabled: true
+    title: "Новости и политика"
+    description: "Подкасты о новостях и политических событиях"
+    category: "News & Politics"
+    author: "news_anchor"
+    sources:
+      # Плейлист "Еженедельные новости"
+      weekly_news:
+        enabled: true
+        type: "playlist"
+        url: "https://www.youtube.com/playlist?list=PLexample123"
+        custom_title: "Еженедельные новости - Подкаст"
+        custom_description: "Еженедельный обзор главных событий"
+        check_interval: 10  # Переопределяет глобальную настройку
+        max_videos: 5       # Переопределяет глобальную настройку
+        category: "News & Politics"
+        author: "news_anchor"
+
+      # Канал Новости24
+      news24:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@news24"
+        custom_title: "Новости24 - Подкаст"
+        custom_description: "Ежедневные новости и аналитика"
+        check_interval: 15  # Проверка каждые 15 минут
+        max_videos: 3       # Проверяем только 3 последних видео
+        category: "News & Politics"
+        author: "news24"
+
+      # Канал ПолитикТВ
+      politiktv:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@politiktv"
+        custom_title: "ПолитикТВ - Подкаст"
+        custom_description: "Политические обзоры и интервью"
+        check_interval: 20  # Проверка каждые 20 минут
+        max_videos: 2       # Проверяем только 2 последних видео
+        category: "News & Politics"
+        author: "politiktv"
+
+  # Подписка "Образование"
+  education:
+    enabled: false  # Отключена по умолчанию
+    title: "Образование"
+    description: "Образовательные подкасты и лекции"
+    category: "Education"
+    author: "education_channel"
+    sources:
+      # Канал УниверситетОнлайн
+      university_online:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@university_online"
+        custom_title: "УниверситетОнлайн - Подкаст"
+        custom_description: "Образовательные лекции и курсы"
+        check_interval: 30  # Проверка каждые 30 минут
+        max_videos: 5       # Проверяем 5 последних видео
+        category: "Education"
+        author: "university_online"
+
+      # Канал НаукаПро
+      nauka_pro:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@nauka_pro"
+        custom_title: "НаукаПро - Подкаст"
+        custom_description: "Научно-популярные лекции"
+        check_interval: 25  # Проверка каждые 25 минут
+        max_videos: 3       # Проверяем 3 последних видео
+        category: "Education"
+        author: "nauka_pro"
+
+  # Подписка "Развлечения"
+  entertainment:
+    enabled: false  # Отключена по умолчанию
+    title: "Развлечения"
+    description: "Развлекательные подкасты и шоу"
+    category: "Entertainment"
+    author: "entertainment_host"
+    sources:
+      # Канал РазвлеченияПлюс
+      entertainment_plus:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@entertainment_plus"
+        custom_title: "РазвлеченияПлюс - Подкаст"
+        custom_description: "Интервью и развлекательные шоу"
+        check_interval: 60  # Проверка каждый час
+        max_videos: 1       # Проверяем только последнее видео
+        category: "Entertainment"
+        author: "entertainment_plus"
+
+      # Канал ШоуТайм
+      showtime:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@showtime"
+        custom_title: "ШоуТайм - Подкаст"
+        custom_description: "Разговорные шоу и интервью"
+        check_interval: 45  # Проверка каждые 45 минут
+        max_videos: 2       # Проверяем 2 последних видео
+        category: "Entertainment"
+        author: "showtime"
+
+  # Подписка "Технологии"
+  technology:
+    enabled: false  # Отключена по умолчанию
+    title: "Технологии"
+    description: "Подкасты о технологиях и IT"
+    category: "Technology"
+    author: "tech_channel"
+    sources:
+      # Канал ТехноБлог
+      technoblog:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@technoblog"
+        custom_title: "ТехноБлог - Подкаст"
+        custom_description: "Обзоры технологий и гаджетов"
+        check_interval: 40  # Проверка каждые 40 минут
+        max_videos: 3       # Проверяем 3 последних видео
+        category: "Technology"
+        author: "technoblog"
+
+      # Канал ITМир
+      it_world:
+        enabled: false  # Отключен по умолчанию
+        type: "channel"
+        url: "https://www.youtube.com/@it_world"
+        custom_title: "ITМир - Подкаст"
+        custom_description: "Обзоры смартфонов и технологий"
+        check_interval: 35  # Проверка каждые 35 минут
+        max_videos: 2       # Проверяем 2 последних видео
+        category: "Technology"
+        author: "it_world"
+
+  # Пример добавления других источников:
+  # another_channel:
+  #   enabled: false  # Отключен по умолчанию
+  #   type: "channel"
+  #   url: "https://www.youtube.com/@another_channel"
+  #   custom_title: "Another Channel - Подкаст"
+  #   custom_description: "Описание подкаста"
+  #   category: "Education"
+  #   author: "another_user"
+
+# Настройки загрузки
+download:
+  format: "bestaudio/best"
+  audio_codec: "mp3"
+  audio_quality: "192"
+  thumbnail_format: "webp"
+  write_subtitles: false
+  write_automatic_subtitles: false
+
+# Настройки RSS
+rss:
+  version: "2.0"
+  namespaces:
+    itunes: "http://www.itunes.com/dtds/podcast-1.0.dtd"
+    content: "http://purl.org/rss/1.0/modules/content/"
+    atom: "http://www.w3.org/2005/Atom"
+  default_category: "News & Politics"
+  default_language: "ru"
+
+# Настройки логирования
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/youtube2podcast.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# Настройки диагностики
+diagnostics:
+  enabled: true
+  test_video_id: "dQw4w9WgXcQ"  # Rick Roll для тестирования
+  network_timeout: 10
+  retry_attempts: 3

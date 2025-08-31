@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  podcast-downloader:
+    build: .
+    container_name: podcast-downloader
+    volumes:
+      # Монтируем папку data для сохранения файлов
+      - ./data:/app/data
+      # Монтируем конфигурацию
+      - ./config.yaml:/app/config.yaml
+    environment:
+      # Переменные окружения если нужны
+      - TZ=Europe/Moscow
+    restart: unless-stopped
+    # Убираем порты, так как веб-интерфейса нет

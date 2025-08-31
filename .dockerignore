@@ -1,0 +1,14 @@
+# Исключаем ненужные файлы из Docker контекста
+data/
+logs/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.git/
+.gitignore
+README.md
+.DS_Store
