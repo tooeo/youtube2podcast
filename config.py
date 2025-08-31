@@ -311,6 +311,10 @@ class ConfigManager:
     def get_rss_setting(self, key: str, default=None):
         """Получить настройку RSS"""
         return self.config.rss_settings.get(key, default)
+    
+    def get_base_url(self) -> str:
+        """Получить базовый URL для RSS ссылок"""
+        return self.config.global_settings.get('base_url', 'http://localhost')
 
 
 # Глобальный экземпляр менеджера конфигурации

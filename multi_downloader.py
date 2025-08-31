@@ -724,8 +724,21 @@ def create_or_update_rss(videos: List[Dict[str, Any]], source: Source, subscript
     
     itunes_category = ET.SubElement(channel, "itunes:category", text=subscription.category)
     
+    # Дополнительные метаданные канала
+    itunes_explicit = ET.SubElement(channel, "itunes:explicit")
+    itunes_explicit.text = "false"
+    
+    itunes_type = ET.SubElement(channel, "itunes:type")
+    itunes_type.text = "episodic"
+    
+    # Получаем базовый URL для RSS ссылок
+    base_url = config_manager.get_base_url()
+    
+    # Добавляем превью канала (используем превью последнего видео)
     itunes_image = ET.SubElement(channel, "itunes:image")
-    itunes_image.set("href", f"data/{subscription.name}/{get_file_hash(latest_video['title'])}.webp")
+    thumbnail_filename = f"{get_file_hash(latest_video['title'])}.webp"
+    thumbnail_url = f"{base_url}/{subscription.name}/{thumbnail_filename}"
+    itunes_image.set("href", thumbnail_url)
     
     # Находим все загруженные аудио файлы в папке подписки
     downloaded_videos = []
@@ -763,13 +776,23 @@ def create_or_update_rss(videos: List[Dict[str, Any]], source: Source, subscript
         
         # Ссылка на аудио файл
         enclosure = ET.SubElement(item, "enclosure")
-        mp3_path = f"data/{subscription.name}/{get_file_hash(video['title'])}.mp3"
-        enclosure.set("url", mp3_path)
+        mp3_filename = f"{get_file_hash(video['title'])}.mp3"
+        mp3_url = f"{base_url}/data/{subscription.name}/{mp3_filename}"
+        enclosure.set("url", mp3_url)
         enclosure.set("type", "audio/mpeg")
+        mp3_path = f"data/{subscription.name}/{mp3_filename}"
         if os.path.exists(mp3_path):
             enclosure.set("length", str(os.path.getsize(mp3_path)))
         else:
             enclosure.set("length", "0")
+        
+        # Превью для эпизода
+        thumbnail_filename = f"{get_file_hash(video['title'])}.webp"
+        thumbnail_path = f"data/{subscription.name}/{thumbnail_filename}"
+        if os.path.exists(thumbnail_path):
+            itunes_item_image = ET.SubElement(item, "itunes:image")
+            thumbnail_url = f"{base_url}/data/{subscription.name}/{thumbnail_filename}"
+            itunes_item_image.set("href", thumbnail_url)
         
         # Длительность для iTunes
         if video['duration']:
@@ -786,6 +809,14 @@ def create_or_update_rss(videos: List[Dict[str, Any]], source: Source, subscript
         # Автор для iTunes
         itunes_item_author = ET.SubElement(item, "itunes:author")
         itunes_item_author.text = video['uploader']
+        
+        # Дополнительные iTunes теги
+        itunes_item_summary = ET.SubElement(item, "itunes:summary")
+        itunes_item_summary.text = f"Эпизод из подписки {subscription.name}: {video['title']}"
+        
+        # Категория эпизода
+        itunes_item_category = ET.SubElement(item, "itunes:category")
+        itunes_item_category.text = subscription.category
     
     # Записываем RSS файл
     tree = ET.ElementTree(rss)

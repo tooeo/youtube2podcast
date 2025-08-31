@@ -7,6 +7,7 @@ global:
   max_videos: 5      # Количество последних видео для проверки
   language: "ru"     # Язык RSS
   timezone: "Europe/Moscow"
+  base_url: "http://my_domain.ru"  # Базовый URL для RSS ссылок на аудио файлы
 
 # Подписки для загрузки
 subscriptions:
