@@ -20,17 +20,23 @@ def safe_parse_xml(file_path):
     # Регистрируем namespace для iTunes
     ET.register_namespace('itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
     
-    # Читаем файл как текст
-    with open(file_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    # Создаем парсер с поддержкой namespace
-    parser = ET.XMLParser(target=ET.TreeBuilder())
-    root = ET.fromstring(content, parser=parser)
-    
-    # Создаем ElementTree
-    tree = ET.ElementTree(root)
-    return tree
+    # Используем простой парсинг без дополнительных настроек
+    try:
+        tree = ET.parse(file_path)
+        return tree
+    except ET.ParseError as e:
+        # Если не удалось распарсить, попробуем прочитать как текст и заменить namespace
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Заменяем namespace на полный URL
+        content = content.replace('xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"', '')
+        content = content.replace('itunes:', '')
+        
+        # Парсим очищенный XML
+        root = ET.fromstring(content)
+        tree = ET.ElementTree(root)
+        return tree
 
 
 def test_rss_with_preview():
@@ -118,7 +124,12 @@ def test_rss_with_preview():
         # Проверяем превью канала
         channel = root.find('channel')
         if channel is not None:
+            # Пробуем найти с namespace
             itunes_image = channel.find('{http://www.itunes.com/dtds/podcast-1.0.dtd}image')
+            if itunes_image is None:
+                # Если не найдено, пробуем без namespace
+                itunes_image = channel.find('image')
+            
             if itunes_image is not None:
                 print(f"🖼️ Превью канала: {itunes_image.get('href')}")
             else:
@@ -130,8 +141,12 @@ def test_rss_with_preview():
         
         for i, item in enumerate(items, 1):
             title = item.find('title')
+            # Пробуем найти с namespace
             itunes_image = item.find('{http://www.itunes.com/dtds/podcast-1.0.dtd}image')
-            
+            if itunes_image is None:
+                # Если не найдено, пробуем без namespace
+                itunes_image = item.find('image')
+
             print(f"  {i}. {title.text if title is not None else 'Без названия'}")
             if itunes_image is not None:
                 print(f"     🖼️ Превью: {itunes_image.get('href')}")
