@@ -2,3 +2,7 @@ yt-dlp>=2024.12.09
 ffmpeg-python>=0.2.0
 PyYAML>=6.0
 requests>=2.31.0
+
+# Test dependencies
+pytest>=6.0
+pytest-cov>=2.0
