@@ -14,12 +14,57 @@ import socket
 import hashlib
 import time
 import signal
+import argparse
 from typing import List, Dict, Any
 
 from config import Source, SourceType, Subscription, get_enabled_sources, get_enabled_subscriptions, get_source_by_name, config_manager
 
 
 running = True
+dry_run = False  # Глобальная переменная для dry-run режима
+
+
+def parse_arguments():
+    """
+    Парсит аргументы командной строки
+    """
+    parser = argparse.ArgumentParser(
+        description='YouTube2Podcast - Загрузка аудио с YouTube источников',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Примеры использования:
+  python multi_downloader.py                    # Обычный запуск
+  python multi_downloader.py --dry-run          # Dry-run режим
+  python multi_downloader.py --loop             # Запуск в цикле
+  python multi_downloader.py --dry-run --loop   # Dry-run в цикле
+        """
+    )
+    
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Показать что будет загружено без фактической загрузки'
+    )
+    
+    parser.add_argument(
+        '--loop',
+        action='store_true',
+        help='Запустить в бесконечном цикле с интервалом 10 минут'
+    )
+    
+    parser.add_argument(
+        '--subscription',
+        type=str,
+        help='Обработать только указанную подписку'
+    )
+    
+    parser.add_argument(
+        '--source',
+        type=str,
+        help='Обработать только указанный источник'
+    )
+    
+    return parser.parse_args()
 
 def signal_handler(signum, frame):
     global running
@@ -768,6 +813,11 @@ def process_source(source: Source, subscription: Subscription) -> bool:
     print("-" * 50)
     
     try:
+        # Если включен dry-run режим, выполняем анализ
+        if dry_run:
+            analysis_result = dry_run_analysis(source, subscription)
+            return analysis_result.get('will_download') is not None
+        
         # Получаем информацию о видео
         videos = get_videos_from_source(source)
         
@@ -795,9 +845,133 @@ def process_source(source: Source, subscription: Subscription) -> bool:
         return False
 
 
-def main_loop():
+def dry_run_analysis(source: Source, subscription: Subscription) -> Dict[str, Any]:
+    """
+    Анализирует что будет загружено без фактической загрузки (dry-run режим)
+    
+    Args:
+        source: Конфигурация источника
+        subscription: Конфигурация подписки
+        
+    Returns:
+        Словарь с информацией о том, что будет загружено
+    """
+    print(f"\n🔍 DRY-RUN: Анализ источника '{source.name}' в подписке '{subscription.name}'")
+    print("=" * 80)
+    
+    # Получаем видео из источника
+    if source.source_type == SourceType.PLAYLIST:
+        playlist_data = get_playlist_info_and_videos(source)
+        videos = playlist_data.get('entries', [])
+        
+        if playlist_data:
+            print(f"📋 Плейлист: {playlist_data.get('title', 'Неизвестно')}")
+            print(f"👤 Автор: {playlist_data.get('uploader', 'Неизвестно')}")
+            print(f"📊 Всего видео: {playlist_data.get('video_count', 0)}")
+            if playlist_data.get('last_updated'):
+                print(f"🔄 Последнее обновление: {playlist_data['last_updated']}")
+    else:
+        videos = get_videos_from_source(source)
+    
+    if not videos:
+        print("❌ DRY-RUN: Нет видео для анализа")
+        return {}
+    
+    # Анализируем последние видео
+    print(f"\n📺 DRY-RUN: Анализ последних {min(source.max_videos, len(videos))} видео:")
+    print("-" * 80)
+    
+    analysis_result = {
+        'source_name': source.name,
+        'subscription_name': subscription.name,
+        'total_videos_found': len(videos),
+        'videos_to_check': min(source.max_videos, len(videos)),
+        'available_videos': [],
+        'unavailable_videos': [],
+        'will_download': None
+    }
+    
+    # Проверяем доступность видео
+    for i, video in enumerate(videos[:source.max_videos]):
+        print(f"\n{i+1}. {video['title']}")
+        print(f"   ID: {video['id']}")
+        print(f"   URL: https://www.youtube.com/watch?v={video['id']}")
+        print(f"   Автор: {video['uploader']}")
+        
+        if video.get('upload_date'):
+            upload_date = video['upload_date']
+            formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+            print(f"   📅 Дата загрузки: {formatted_date}")
+        
+        if video.get('playlist_position'):
+            print(f"   📋 Позиция в плейлисте: {video['playlist_position']}")
+        
+        # Проверяем доступность
+        is_available = check_video_availability(video['id'])
+        
+        if is_available:
+            print(f"   ✅ Доступно")
+            analysis_result['available_videos'].append(video)
+        else:
+            print(f"   ❌ Недоступно")
+            analysis_result['unavailable_videos'].append(video)
+    
+    # Определяем какое видео будет загружено
+    if analysis_result['available_videos']:
+        will_download = analysis_result['available_videos'][0]  # Первое доступное
+        analysis_result['will_download'] = will_download
+        
+        print(f"\n🎯 DRY-RUN: Будет загружено видео:")
+        print(f"   Название: {will_download['title']}")
+        print(f"   ID: {will_download['id']}")
+        print(f"   URL: https://www.youtube.com/watch?v={will_download['id']}")
+        
+        # Проверяем, существует ли уже файл
+        file_hash = get_file_hash(will_download['title'])
+        mp3_filename = f"{file_hash}.mp3"
+        subscription_dir = f"data/{subscription.name}"
+        mp3_path = os.path.join(subscription_dir, mp3_filename)
+        
+        if os.path.exists(mp3_path):
+            print(f"   ⚠️  Файл уже существует: {mp3_filename}")
+            print(f"   📁 Путь: {mp3_path}")
+            analysis_result['file_exists'] = True
+        else:
+            print(f"   📁 Файл будет создан: {mp3_filename}")
+            print(f"   📁 Путь: {mp3_path}")
+            analysis_result['file_exists'] = False
+        
+        # Показываем настройки загрузки
+        download_settings = config_manager.get_download_setting('format', 'bestaudio/best')
+        audio_codec = config_manager.get_download_setting('audio_codec', 'mp3')
+        audio_quality = config_manager.get_download_setting('audio_quality', '192')
+        
+        print(f"\n⚙️  DRY-RUN: Настройки загрузки:")
+        print(f"   Формат: {download_settings}")
+        print(f"   Кодек: {audio_codec}")
+        print(f"   Качество: {audio_quality}")
+        
+    else:
+        print(f"\n❌ DRY-RUN: Нет доступных видео для загрузки")
+        analysis_result['will_download'] = None
+    
+    # Статистика
+    print(f"\n📊 DRY-RUN: Статистика:")
+    print(f"   Всего найдено видео: {analysis_result['total_videos_found']}")
+    print(f"   Проверено видео: {analysis_result['videos_to_check']}")
+    print(f"   Доступных видео: {len(analysis_result['available_videos'])}")
+    print(f"   Недоступных видео: {len(analysis_result['unavailable_videos'])}")
+    
+    return analysis_result
+
+
+def main_loop(subscription_filter: str = None, source_filter: str = None):
     """
     Основной цикл программы с автоматическим запуском
+    
+    Args:
+        subscription_filter: Фильтр по названию подписки (опционально)
+        source_filter: Фильтр по названию источника (опционально)
     """
     global running
     
@@ -805,8 +979,13 @@ def main_loop():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    print("🎙️  YouTube2Podcast Multi-Source загрузчик запущен")
+    mode_text = "DRY-RUN" if dry_run else "Обычный"
+    print(f"🎙️  YouTube2Podcast Multi-Source загрузчик запущен ({mode_text} режим)")
     print("⏰ Программа будет обрабатывать все источники каждые 10 минут")
+    if subscription_filter:
+        print(f"📋 Фильтр подписки: {subscription_filter}")
+    if source_filter:
+        print(f"📋 Фильтр источника: {source_filter}")
     print("🛑 Для остановки нажмите Ctrl+C")
     print("=" * 50)
     
@@ -872,14 +1051,19 @@ def main_loop():
     print("👋 Программа завершена")
 
 
-def main():
+def main(subscription_filter: str = None, source_filter: str = None):
     """
     Основная функция для однократного запуска
+    
+    Args:
+        subscription_filter: Фильтр по названию подписки (опционально)
+        source_filter: Фильтр по названию источника (опционально)
     """
     # Запускаем диагностику сетевых проблем
     diagnose_network_issues()
     
-    print("🎙️  YouTube2Podcast Multi-Source - Однократный запуск")
+    mode_text = "DRY-RUN" if dry_run else "Обычный"
+    print(f"🎙️  YouTube2Podcast Multi-Source - Однократный запуск ({mode_text} режим)")
     print("=" * 50)
     
     # Получаем активные подписки
@@ -888,6 +1072,14 @@ def main():
     if not enabled_subscriptions:
         print("❌ Нет активных подписок для обработки")
         return
+    
+    # Фильтруем подписки если указан фильтр
+    if subscription_filter:
+        enabled_subscriptions = [sub for sub in enabled_subscriptions if sub.name == subscription_filter]
+        if not enabled_subscriptions:
+            print(f"❌ Подписка '{subscription_filter}' не найдена или неактивна")
+            return
+        print(f"📋 Фильтр подписки: {subscription_filter}")
     
     print(f"📋 Найдено {len(enabled_subscriptions)} активных подписок")
     
@@ -905,6 +1097,14 @@ def main():
         subscription_success_count = 0
         enabled_sources = [source for source in subscription.sources if source.enabled]
         
+        # Фильтруем источники если указан фильтр
+        if source_filter:
+            enabled_sources = [source for source in enabled_sources if source.name == source_filter]
+            if not enabled_sources:
+                print(f"❌ Источник '{source_filter}' не найден или неактивен в подписке '{subscription.name}'")
+                continue
+            print(f"📋 Фильтр источника: {source_filter}")
+        
         for source in enabled_sources:
             if process_source(source, subscription):
                 subscription_success_count += 1
@@ -917,8 +1117,24 @@ def main():
     print(f"\n📊 Общая обработка завершена. Успешно: {total_success_count}/{total_sources_count} источников")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--loop":
-        main_loop()
+def init_application():
+    """
+    Инициализирует приложение с аргументами командной строки
+    """
+    global dry_run
+    
+    # Парсим аргументы командной строки
+    args = parse_arguments()
+    
+    # Устанавливаем глобальные переменные
+    dry_run = args.dry_run
+    
+    # Запускаем в зависимости от аргументов
+    if args.loop:
+        main_loop(args.subscription, args.source)
     else:
-        main()
+        main(args.subscription, args.source)
+
+
+if __name__ == "__main__":
+    init_application()
