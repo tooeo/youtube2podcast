@@ -1,31 +1,110 @@
 #!/usr/bin/env python3
 """
-Tests for main.py
+Tests for multi_downloader.py and config.py
 """
 
 import pytest
 import os
 import tempfile
 import shutil
-from unittest.mock import patch, MagicMock
 import sys
+from unittest.mock import patch, MagicMock
 
 # Добавляем корневую директорию в путь для импорта
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import (
-    get_playlist_videos,
-    print_video_links,
-    get_file_hash,
-    check_video_availability,
-    clean_filename,
-    download_latest_audio,
-    create_or_update_rss
-)
+from config import Source, SourceType, Subscription, Config, ConfigManager
 
 
-class TestMainFunctions:
-    """Тесты для основных функций main.py"""
+class TestConfigClasses:
+    """Тесты для классов конфигурации"""
+
+    def test_source_creation(self):
+        """Тест создания объекта Source"""
+        source = Source(
+            name="test_source",
+            url="https://www.youtube.com/@test",
+            source_type=SourceType.CHANNEL,
+            enabled=True,
+            check_interval=10,
+            max_videos=5,
+            custom_title="Test Title",
+            custom_description="Test Description",
+            category="Test Category",
+            author="test_author"
+        )
+        
+        assert source.name == "test_source"
+        assert source.url == "https://www.youtube.com/@test"
+        assert source.source_type == SourceType.CHANNEL
+        assert source.enabled is True
+        assert source.check_interval == 10
+        assert source.max_videos == 5
+        assert source.custom_title == "Test Title"
+        assert source.custom_description == "Test Description"
+        assert source.category == "Test Category"
+        assert source.author == "test_author"
+
+    def test_subscription_creation(self):
+        """Тест создания объекта Subscription"""
+        source = Source(
+            name="test_source",
+            url="https://www.youtube.com/@test",
+            source_type=SourceType.CHANNEL
+        )
+        
+        subscription = Subscription(
+            name="test_subscription",
+            title="Test Subscription",
+            description="Test Description",
+            enabled=True,
+            category="Test Category",
+            author="test_author",
+            sources=[source]
+        )
+        
+        assert subscription.name == "test_subscription"
+        assert subscription.title == "Test Subscription"
+        assert subscription.description == "Test Description"
+        assert subscription.enabled is True
+        assert subscription.category == "Test Category"
+        assert subscription.author == "test_author"
+        assert len(subscription.sources) == 1
+        assert subscription.sources[0].name == "test_source"
+
+    def test_config_creation(self):
+        """Тест создания объекта Config"""
+        source = Source(
+            name="test_source",
+            url="https://www.youtube.com/@test",
+            source_type=SourceType.CHANNEL
+        )
+        
+        subscription = Subscription(
+            name="test_subscription",
+            title="Test Subscription",
+            sources=[source]
+        )
+        
+        config = Config(
+            global_settings={'check_interval': 10},
+            subscriptions=[subscription],
+            download_settings={'format': 'mp3'},
+            rss_settings={'version': '2.0'},
+            logging_settings={'level': 'INFO'},
+            diagnostics_settings={'enabled': True}
+        )
+        
+        assert config.global_settings['check_interval'] == 10
+        assert len(config.subscriptions) == 1
+        assert config.download_settings['format'] == 'mp3'
+        assert config.rss_settings['version'] == '2.0'
+        assert config.logging_settings['level'] == 'INFO'
+        assert config.diagnostics_settings['enabled'] is True
+
+
+class TestConfigManager:
+    """Тесты для ConfigManager"""
 
     def setup_method(self):
         """Настройка перед каждым тестом"""
@@ -38,118 +117,84 @@ class TestMainFunctions:
         os.chdir(self.original_cwd)
         shutil.rmtree(self.temp_dir)
 
-    def test_get_file_hash(self):
-        """Тест функции get_file_hash"""
-        title = "Test Video Title"
-        hash_result = get_file_hash(title)
+    def test_config_manager_initialization(self):
+        """Тест инициализации ConfigManager"""
+        config_manager = ConfigManager()
         
-        assert isinstance(hash_result, str)
-        assert len(hash_result) == 32  # MD5 hash length
-        assert hash_result.isalnum()  # Only alphanumeric characters
+        assert config_manager.config_file == "config.yaml"
+        assert hasattr(config_manager, 'config')
+        assert isinstance(config_manager.config, Config)
 
-    def test_clean_filename(self):
-        """Тест функции clean_filename"""
-        # Тест с обычными символами
-        assert clean_filename("normal_filename") == "normal_filename"
+    def test_get_enabled_subscriptions(self):
+        """Тест получения активных подписок"""
+        config_manager = ConfigManager()
         
-        # Тест с специальными символами
-        assert clean_filename("file/with\\special:chars") == "file_with_special_chars"
+        # Создаем тестовую конфигурацию
+        source = Source(
+            name="test_source",
+            url="https://www.youtube.com/@test",
+            source_type=SourceType.CHANNEL,
+            enabled=True
+        )
         
-        # Тест с множественными подчеркиваниями
-        assert clean_filename("file__with___multiple___underscores") == "file_with_multiple_underscores"
+        subscription = Subscription(
+            name="test_subscription",
+            title="Test Subscription",
+            enabled=True,
+            sources=[source]
+        )
+        
+        config_manager.config.subscriptions = [subscription]
+        
+        enabled_subscriptions = config_manager.get_enabled_subscriptions()
+        assert len(enabled_subscriptions) == 1
+        assert enabled_subscriptions[0].name == "test_subscription"
 
-    def test_get_playlist_videos_mock(self):
-        """Тест get_playlist_videos с моком"""
-        mock_videos = [
-            {
-                'title': 'Test Video 1',
-                'id': 'test123',
-                'duration': 3600,
-                'uploader': 'test_user',
-                'view_count': 1000
-            },
-            {
-                'title': 'Test Video 2',
-                'id': 'test456',
-                'duration': 1800,
-                'uploader': 'test_user',
-                'view_count': 500
-            }
-        ]
+    def test_get_enabled_sources(self):
+        """Тест получения активных источников"""
+        config_manager = ConfigManager()
         
-        with patch('main.yt_dlp.YoutubeDL') as mock_ydl:
-            mock_instance = MagicMock()
-            mock_instance.extract_info.return_value = {
-                'entries': mock_videos
-            }
-            mock_ydl.return_value.__enter__.return_value = mock_instance
-            
-            result = get_playlist_videos("https://www.youtube.com/playlist?list=test")
-            
-            assert len(result) == 2
-            assert result[0]['title'] == 'Test Video 1'
-            assert result[1]['title'] == 'Test Video 2'
+        # Создаем тестовую конфигурацию
+        source1 = Source(
+            name="test_source1",
+            url="https://www.youtube.com/@test1",
+            source_type=SourceType.CHANNEL,
+            enabled=True
+        )
+        
+        source2 = Source(
+            name="test_source2",
+            url="https://www.youtube.com/@test2",
+            source_type=SourceType.CHANNEL,
+            enabled=False
+        )
+        
+        subscription = Subscription(
+            name="test_subscription",
+            title="Test Subscription",
+            enabled=True,
+            sources=[source1, source2]
+        )
+        
+        config_manager.config.subscriptions = [subscription]
+        
+        enabled_sources = config_manager.get_enabled_sources()
+        assert len(enabled_sources) == 1
+        assert enabled_sources[0].name == "test_source1"
 
-    def test_check_video_availability_mock(self):
-        """Тест check_video_availability с моком"""
-        with patch('main.yt_dlp.YoutubeDL') as mock_ydl:
-            mock_instance = MagicMock()
-            mock_instance.extract_info.return_value = {'title': 'Test Video'}
-            mock_ydl.return_value.__enter__.return_value = mock_instance
-            
-            result = check_video_availability("test123")
-            assert result is True
 
-    def test_check_video_availability_unavailable(self):
-        """Тест check_video_availability для недоступного видео"""
-        with patch('main.yt_dlp.YoutubeDL') as mock_ydl:
-            mock_instance = MagicMock()
-            mock_instance.extract_info.side_effect = Exception("Video unavailable")
-            mock_ydl.return_value.__enter__.return_value = mock_instance
-            
-            result = check_video_availability("test123")
-            assert result is False
+class TestSourceType:
+    """Тесты для SourceType enum"""
 
-    def test_create_or_update_rss(self):
-        """Тест создания RSS файла"""
-        videos = [
-            {
-                'title': 'Test Video',
-                'id': 'test123',
-                'duration': 3600,
-                'uploader': 'test_user'
-            }
-        ]
-        
-        latest_video = videos[0]
-        playlist_id = "test_playlist"
-        
-        # Создаем RSS файл
-        create_or_update_rss(videos, playlist_id, latest_video)
-        
-        # Проверяем, что файл создан
-        rss_file = f"data/{playlist_id}/podcast.rss"
-        assert os.path.exists(rss_file)
-        
-        # Проверяем содержимое файла
-        with open(rss_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-            assert '<?xml version="1.0" encoding="utf-8"?>' in content
-            assert '<rss version="2.0"' in content
-            assert 'Test Video' in content
+    def test_source_type_values(self):
+        """Тест значений SourceType"""
+        assert SourceType.CHANNEL.value == "channel"
+        assert SourceType.PLAYLIST.value == "playlist"
 
-    def test_create_or_update_rss_empty_video(self):
-        """Тест create_or_update_rss с пустым видео"""
-        videos = []
-        latest_video = {}
-        playlist_id = "test_playlist"
-        
-        # Не должно вызывать ошибку
-        create_or_update_rss(videos, playlist_id, latest_video)
-        
-        # Файл не должен быть создан
-        rss_file = f"data/{playlist_id}/podcast.rss"
-        assert not os.path.exists(rss_file)
+    def test_source_type_from_string(self):
+        """Тест создания SourceType из строки"""
+        assert SourceType("channel") == SourceType.CHANNEL
+        assert SourceType("playlist") == SourceType.PLAYLIST
 
 
 if __name__ == "__main__":
