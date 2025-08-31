@@ -15,7 +15,7 @@ def test_imports():
         print("✅ yt-dlp: {}".format(yt_dlp.version.__version__))
     except ImportError as e:
         print("❌ yt-dlp: {}".format(e))
-        return False
+        assert False, f"yt-dlp import failed: {e}"
     
     # Тестируем ffmpeg-python
     try:
@@ -23,7 +23,7 @@ def test_imports():
         print("✅ ffmpeg-python")
     except ImportError as e:
         print(f"❌ ffmpeg-python: {e}")
-        return False
+        assert False, f"ffmpeg-python import failed: {e}"
     
     # Тестируем PyYAML
     try:
@@ -31,7 +31,7 @@ def test_imports():
         print("✅ PyYAML")
     except ImportError as e:
         print(f"❌ PyYAML: {e}")
-        return False
+        assert False, f"PyYAML import failed: {e}"
     
     # Тестируем requests
     try:
@@ -39,7 +39,7 @@ def test_imports():
         print("✅ requests: {}".format(requests.__version__))
     except ImportError as e:
         print("❌ requests: {}".format(e))
-        return False
+        assert False, f"requests import failed: {e}"
     
     # Тестируем наши модули
     try:
@@ -47,30 +47,29 @@ def test_imports():
         print("✅ config.py")
     except ImportError as e:
         print(f"❌ config.py: {e}")
-        return False
+        assert False, f"config.py import failed: {e}"
     
     try:
         import multi_downloader
         print("✅ multi_downloader.py")
     except ImportError as e:
         print(f"❌ multi_downloader.py: {e}")
-        return False
+        assert False, f"multi_downloader.py import failed: {e}"
     
     try:
         import manage_sources
         print("✅ manage_sources.py")
     except ImportError as e:
         print(f"❌ manage_sources.py: {e}")
-        return False
+        assert False, f"manage_sources.py import failed: {e}"
     
     print("✅ Все зависимости работают!")
-    return True
 
 
 if __name__ == "__main__":
-    success = test_imports()
-    if not success:
-        print("❌ Некоторые зависимости не работают!")
-        exit(1)
-    else:
+    try:
+        test_imports()
         print("🎉 Все тесты прошли успешно!")
+    except AssertionError as e:
+        print(f"❌ Некоторые зависимости не работают: {e}")
+        exit(1)

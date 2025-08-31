@@ -11,7 +11,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import Source, SourceType
-from multi_downloader import get_videos_from_source, print_video_links
+from multi_downloader import get_videos_from_source, get_latest_video_from_source, print_video_links
 
 
 def test_channel_extraction():
@@ -37,19 +37,39 @@ def test_channel_extraction():
     print(f"Максимум видео для проверки: {test_source.max_videos}")
     print("=" * 60)
     
-    # Извлекаем видео
+    # Тест 1: Извлекаем несколько последних видео
+    print("\n📡 Тест 1: Извлечение нескольких последних видео")
+    import time
+    start_time = time.time()
     videos = get_videos_from_source(test_source)
+    end_time = time.time()
     
     if not videos:
         print("❌ Не удалось извлечь видео из канала")
         return
     
-    print(f"\n✅ Успешно извлечено {len(videos)} видео")
+    print(f"✅ Успешно извлечено {len(videos)} видео за {end_time - start_time:.2f} секунд")
     print("=" * 60)
     
     # Показываем первые 10 видео с датами
     print("📋 Первые 10 видео (отсортированные по дате загрузки):")
     print_video_links(videos[:10], test_source.name)
+    
+    # Тест 2: Извлекаем только последнее видео
+    print("\n📡 Тест 2: Извлечение только последнего видео")
+    start_time = time.time()
+    latest_video = get_latest_video_from_source(test_source)
+    end_time = time.time()
+    
+    if latest_video:
+        print(f"✅ Успешно извлечено последнее видео за {end_time - start_time:.2f} секунд")
+        print(f"📺 Название: {latest_video['title']}")
+        if latest_video.get('upload_date'):
+            upload_date = latest_video['upload_date']
+            formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+            print(f"📅 Дата загрузки: {formatted_date}")
+    else:
+        print("❌ Не удалось извлечь последнее видео")
     
     # Проверяем сортировку
     print("\n🔍 Проверка сортировки:")

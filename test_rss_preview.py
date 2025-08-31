@@ -97,6 +97,9 @@ def test_rss_with_preview():
         tree = ET.parse(rss_file)
         root = tree.getroot()
         
+        # Регистрируем namespace для iTunes
+        ET.register_namespace('itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
+        
         # Проверяем превью канала
         channel = root.find('channel')
         if channel is not None:
@@ -145,6 +148,9 @@ def validate_rss_structure():
         return
     
     try:
+        # Регистрируем namespace для iTunes
+        ET.register_namespace('itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
+        
         tree = ET.parse(rss_file)
         root = tree.getroot()
         

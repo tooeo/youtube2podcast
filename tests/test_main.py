@@ -140,6 +140,7 @@ class TestConfigManager:
         subscription = Subscription(
             name="test_subscription",
             title="Test Subscription",
+            description="Test subscription description",
             enabled=True,
             sources=[source]
         )
@@ -172,6 +173,7 @@ class TestConfigManager:
         subscription = Subscription(
             name="test_subscription",
             title="Test Subscription",
+            description="Test subscription description",
             enabled=True,
             sources=[source1, source2]
         )
