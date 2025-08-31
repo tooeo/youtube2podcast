@@ -48,15 +48,29 @@ def check_video_availability(video_id: str) -> bool:
         'quiet': True,
         'no_warnings': True,
         'ignoreerrors': True,
+        'extract_flat': True,
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Пытаемся извлечь информацию о видео
             result = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            return result is not None
+            if result and result.get('title'):
+                return True
+            return False
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        if "Video unavailable" in error_msg:
+            print(f"   ❌ Видео недоступно (ID: {video_id})")
+        elif "Private video" in error_msg:
+            print(f"   ❌ Приватное видео (ID: {video_id})")
+        elif "This video is not available" in error_msg:
+            print(f"   ❌ Видео недоступно в регионе (ID: {video_id})")
+        else:
+            print(f"   ❌ Ошибка доступа: {error_msg}")
+        return False
     except Exception as e:
-        # Если есть ошибка, видео недоступно
+        print(f"   ❌ Неожиданная ошибка при проверке видео {video_id}: {e}")
         return False
 
 
@@ -114,6 +128,62 @@ def clean_filename(filename: str) -> str:
     # Убираем множественные подчеркивания
     cleaned = re.sub(r'_+', '_', cleaned)
     return cleaned
+
+
+def diagnose_video_issue(video_id: str, video_title: str = ""):
+    """
+    Диагностирует проблемы с конкретным видео
+    
+    Args:
+        video_id: ID видео на YouTube
+        video_title: Название видео (опционально)
+    """
+    print(f"🔍 Диагностика видео: {video_title or video_id}")
+    print(f"   ID: {video_id}")
+    print(f"   URL: https://www.youtube.com/watch?v={video_id}")
+    
+    # Проверяем доступность через разные методы
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'ignoreerrors': True,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Пробуем извлечь полную информацию
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+            if info:
+                print(f"   ✅ Видео доступно")
+                print(f"   📺 Название: {info.get('title', 'Неизвестно')}")
+                print(f"   👤 Автор: {info.get('uploader', 'Неизвестно')}")
+                print(f"   ⏱️ Длительность: {info.get('duration', 0)} сек")
+                print(f"   👀 Просмотры: {info.get('view_count', 'Неизвестно')}")
+                return True
+            else:
+                print(f"   ❌ Видео недоступно")
+                return False
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        print(f"   ❌ Ошибка yt-dlp: {error_msg}")
+        
+        if "Video unavailable" in error_msg:
+            print(f"   💡 Возможные причины:")
+            print(f"      - Видео удалено автором")
+            print(f"      - Видео приватное")
+            print(f"      - Видео ограничено по возрасту")
+            print(f"      - Видео заблокировано в вашем регионе")
+        elif "Private video" in error_msg:
+            print(f"   💡 Видео приватное - требуется авторизация")
+        elif "This video is not available" in error_msg:
+            print(f"   💡 Видео недоступно в вашем регионе")
+        elif "Sign in to confirm your age" in error_msg:
+            print(f"   💡 Требуется подтверждение возраста")
+        
+        return False
+    except Exception as e:
+        print(f"   ❌ Неожиданная ошибка: {e}")
+        return False
 
 
 def get_videos_from_source(source: Source) -> List[Dict[str, Any]]:
@@ -222,6 +292,10 @@ def download_latest_audio(videos: List[Dict[str, Any]], source: Source, subscrip
             break
         else:
             print(f"❌ Видео недоступно: {video['title']}")
+            # Если это последнее видео и оно недоступно, запускаем подробную диагностику
+            if i == max_check - 1:
+                print(f"\n🔍 Запускаем подробную диагностику последнего видео...")
+                diagnose_video_issue(video['id'], video['title'])
     
     if not latest_video:
         print(f"❌ Не найдено доступных видео для загрузки в источнике: {source.name}")
@@ -277,12 +351,39 @@ def download_latest_audio(videos: List[Dict[str, Any]], source: Source, subscrip
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             video_url = f"https://www.youtube.com/watch?v={latest_video['id']}"
             print(f"Начинаю загрузку: {video_url}")
+            
+            # Сначала проверяем доступность видео перед загрузкой
+            try:
+                info = ydl.extract_info(video_url, download=False)
+                if not info:
+                    print(f"❌ Видео недоступно для загрузки: {latest_video['title']}")
+                    return {}
+                print(f"✅ Видео доступно для загрузки: {info.get('title', latest_video['title'])}")
+            except Exception as extract_error:
+                print(f"❌ Ошибка при проверке доступности видео: {extract_error}")
+                print(f"Пробуем следующее видео...")
+                return {}
+            
+            # Загружаем видео
             ydl.download([video_url])
-            print(f"Аудио успешно загружено в папку: {subscription_dir}")
+            print(f"✅ Аудио успешно загружено в папку: {subscription_dir}")
             return latest_video
             
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        if "Video unavailable" in error_msg:
+            print(f"❌ Видео недоступно: {latest_video['title']}")
+            print(f"   ID: {latest_video['id']}")
+            print(f"   Возможные причины: видео удалено, приватное, ограничено по возрасту или региону")
+        elif "Private video" in error_msg:
+            print(f"❌ Приватное видео: {latest_video['title']}")
+        elif "This video is not available" in error_msg:
+            print(f"❌ Видео недоступно в вашем регионе: {latest_video['title']}")
+        else:
+            print(f"❌ Ошибка загрузки: {error_msg}")
+        return {}
     except Exception as e:
-        print(f"❌ Ошибка при загрузке аудио из источника '{source.name}': {e}")
+        print(f"❌ Неожиданная ошибка при загрузке аудио из источника '{source.name}': {e}")
         return {}
 
 
