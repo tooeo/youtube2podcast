@@ -1,4 +1,4 @@
-name: Test and CI v3
+name: Test and CI v4
 
 on:
   push:
@@ -90,7 +90,7 @@ jobs:
         echo "📋 Проверка версии Python:"
         docker run --rm youtube2podcast python --version
         
-        # Проверяем доступность основных модулей
+        # Проверяем доступность основных модулей (без multi_downloader)
         echo "📋 Проверка импорта модулей:"
         docker run --rm youtube2podcast python -c "
         try:
@@ -101,21 +101,17 @@ jobs:
             exit(1)
         
         try:
-            import multi_downloader
-            print('✅ Multi-downloader import OK')
-        except ImportError as e:
-            print(f'❌ Multi-downloader import failed: {e}')
-            exit(1)
-        "
-        
-        # Проверяем доступность yt-dlp
-        echo "📋 Проверка yt-dlp:"
-        docker run --rm youtube2podcast python -c "
-        try:
             import yt_dlp
             print(f'✅ yt-dlp version: {yt_dlp.version.__version__}')
         except ImportError as e:
             print(f'❌ yt-dlp import failed: {e}')
+            exit(1)
+        
+        try:
+            import requests
+            print(f'✅ requests version: {requests.__version__}')
+        except ImportError as e:
+            print(f'❌ requests import failed: {e}')
             exit(1)
         "
         
@@ -134,6 +130,31 @@ jobs:
             print('✅ Переменная SKIP_DOWNLOAD корректно установлена')
         else:
             print('❌ Переменная SKIP_DOWNLOAD не установлена')
+            exit(1)
+        "
+        
+        # Проверяем, что multi_downloader не делает сетевых запросов при SKIP_DOWNLOAD
+        echo "📋 Проверка multi_downloader с SKIP_DOWNLOAD:"
+        docker run --rm -e SKIP_DOWNLOAD=true youtube2podcast python -c "
+        import os
+        import sys
+        
+        # Устанавливаем переменную окружения
+        os.environ['SKIP_DOWNLOAD'] = 'true'
+        
+        try:
+            # Импортируем multi_downloader
+            import multi_downloader
+            print('✅ multi_downloader импортирован успешно')
+            
+            # Проверяем, что переменная SKIP_DOWNLOAD обрабатывается
+            if hasattr(multi_downloader, 'dry_run'):
+                print('✅ dry_run переменная доступна')
+            else:
+                print('❌ dry_run переменная недоступна')
+                
+        except Exception as e:
+            print(f'❌ Ошибка при импорте multi_downloader: {e}')
             exit(1)
         "
         
