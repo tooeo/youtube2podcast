@@ -89,15 +89,45 @@ def test_subscription_creation():
 
 def test_config_manager_base_url():
     """Тест метода get_base_url"""
+    import tempfile
+    import yaml
     from config import ConfigManager
     
-    # Создаем временный ConfigManager
-    config_manager = ConfigManager()
+    # Создаем временную директорию и config.yaml
+    temp_dir = tempfile.mkdtemp()
+    original_cwd = os.getcwd()
+    os.chdir(temp_dir)
     
-    # Тестируем получение базового URL
-    base_url = config_manager.get_base_url()
-    assert isinstance(base_url, str)
-    assert len(base_url) > 0
+    try:
+        # Создаем тестовый config.yaml
+        test_config = {
+            'global': {
+                'base_url': 'http://test.domain.com'
+            },
+            'subscriptions': {},
+            'download': {},
+            'rss': {},
+            'logging': {},
+            'diagnostics': {}
+        }
+        
+        with open('config.yaml', 'w', encoding='utf-8') as f:
+            yaml.dump(test_config, f, default_flow_style=False, allow_unicode=True)
+        
+        # Создаем ConfigManager
+        config_manager = ConfigManager()
+        
+        # Тестируем получение базового URL
+        base_url = config_manager.get_base_url()
+        assert isinstance(base_url, str)
+        assert len(base_url) > 0
+        assert base_url == 'http://test.domain.com'
+    
+    finally:
+        # Очистка
+        os.chdir(original_cwd)
+        import shutil
+        shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":

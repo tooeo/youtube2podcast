@@ -84,6 +84,7 @@ class TestConfigClasses:
         subscription = Subscription(
             name="test_subscription",
             title="Test Subscription",
+            description="Test subscription description",
             sources=[source]
         )
         
@@ -235,7 +236,7 @@ class TestConfigManager:
         # Заменяем подписки в конфигурации
         config_manager.config.subscriptions = [subscription]
         
-        enabled_sources = config_manager.get_enabled_sources()
+        enabled_sources = config_manager.get_all_enabled_sources()
         assert len(enabled_sources) == 1
         assert enabled_sources[0].name == "test_source1"
 
