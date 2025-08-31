@@ -87,5 +87,18 @@ def test_subscription_creation():
     assert subscription.sources[0].name == "test_source"
 
 
+def test_config_manager_base_url():
+    """Тест метода get_base_url"""
+    from config import ConfigManager
+    
+    # Создаем временный ConfigManager
+    config_manager = ConfigManager()
+    
+    # Тестируем получение базового URL
+    base_url = config_manager.get_base_url()
+    assert isinstance(base_url, str)
+    assert len(base_url) > 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

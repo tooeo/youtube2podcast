@@ -20,6 +20,7 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+        check-latest: true
     
     - name: Install FFmpeg
       run: |
@@ -41,9 +42,14 @@ jobs:
       run: |
         black --check --diff . || true
     
+    - name: Test imports
+      run: |
+        python -c "from config import Source, SourceType, Subscription, Config, ConfigManager; print('✅ Config imports OK')"
+        python -c "import multi_downloader; print('✅ Multi-downloader import OK')"
+    
     - name: Test with pytest
       run: |
-        pytest -v
+        python -m pytest tests/ -v --tb=short
 
   docker:
     runs-on: ubuntu-22.04
