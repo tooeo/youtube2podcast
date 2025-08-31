@@ -8,6 +8,7 @@ import os
 import tempfile
 import shutil
 import sys
+import yaml
 from unittest.mock import patch, MagicMock
 
 # Добавляем корневую директорию в путь для импорта
@@ -111,6 +112,57 @@ class TestConfigManager:
         self.temp_dir = tempfile.mkdtemp()
         self.original_cwd = os.getcwd()
         os.chdir(self.temp_dir)
+        
+        # Создаем тестовый config.yaml
+        test_config = {
+            'global': {
+                'check_interval': 10,
+                'max_videos': 5,
+                'language': 'ru',
+                'timezone': 'Europe/Moscow',
+                'base_url': 'http://test.domain.com'
+            },
+            'subscriptions': {
+                'test_subscription': {
+                    'enabled': True,
+                    'title': 'Test Subscription',
+                    'description': 'Test subscription description',
+                    'category': 'Test',
+                    'author': 'test_author',
+                    'sources': {
+                        'test_source': {
+                            'enabled': True,
+                            'type': 'channel',
+                            'url': 'https://www.youtube.com/@test',
+                            'custom_title': 'Test Source',
+                            'custom_description': 'Test Description',
+                            'category': 'Test',
+                            'author': 'test_author'
+                        }
+                    }
+                }
+            },
+            'download': {
+                'format': 'bestaudio/best',
+                'audio_codec': 'mp3'
+            },
+            'rss': {
+                'version': '2.0'
+            },
+            'logging': {
+                'level': 'INFO'
+            },
+            'diagnostics': {
+                'enabled': True
+            }
+        }
+        
+        import yaml
+        with open('config.yaml', 'w', encoding='utf-8') as f:
+            yaml.dump(test_config, f, default_flow_style=False, allow_unicode=True)
+        
+        # Проверяем, что файл создан
+        assert os.path.exists('config.yaml'), "config.yaml должен быть создан в setup_method"
 
     def teardown_method(self):
         """Очистка после каждого теста"""
@@ -119,6 +171,7 @@ class TestConfigManager:
 
     def test_config_manager_initialization(self):
         """Тест инициализации ConfigManager"""
+        # config.yaml уже создан в setup_method
         config_manager = ConfigManager()
         
         assert config_manager.config_file == "config.yaml"
@@ -145,6 +198,7 @@ class TestConfigManager:
             sources=[source]
         )
         
+        # Заменяем подписки в конфигурации
         config_manager.config.subscriptions = [subscription]
         
         enabled_subscriptions = config_manager.get_enabled_subscriptions()
@@ -178,6 +232,7 @@ class TestConfigManager:
             sources=[source1, source2]
         )
         
+        # Заменяем подписки в конфигурации
         config_manager.config.subscriptions = [subscription]
         
         enabled_sources = config_manager.get_enabled_sources()
