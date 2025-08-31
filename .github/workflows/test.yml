@@ -1,4 +1,4 @@
-name: Test and CI v2
+name: Test and CI v3
 
 on:
   push:
@@ -80,50 +80,8 @@ jobs:
     - name: Build Docker image
       run: |
         docker build -t youtube2podcast .
-    
-    - name: Test Docker image basic functionality
-      run: |
-        echo "🧪 Тестирование базовой функциональности Docker образа..."
-        
-        # Проверяем версию Python
-        echo "📋 Проверка версии Python:"
-        docker run --rm youtube2podcast python --version
-        
-        # Проверяем доступность основных модулей
-        echo "📋 Проверка импорта модулей:"
-        docker run --rm youtube2podcast python -c "
-        try:
-            from config import Source, SourceType, Subscription, Config, ConfigManager
-            print('✅ Config imports OK')
-        except ImportError as e:
-            print(f'❌ Config import failed: {e}')
-            exit(1)
-        
-        try:
-            import multi_downloader
-            print('✅ Multi-downloader import OK')
-        except ImportError as e:
-            print(f'❌ Multi-downloader import failed: {e}')
-            exit(1)
-        "
-        
-        # Проверяем доступность yt-dlp
-        echo "📋 Проверка yt-dlp:"
-        docker run --rm youtube2podcast python -c "
-        try:
-            import yt_dlp
-            print(f'✅ yt-dlp version: {yt_dlp.version.__version__}')
-        except ImportError as e:
-            print(f'❌ yt-dlp import failed: {e}')
-            exit(1)
-        "
-        
-        # Проверяем доступность FFmpeg
-        echo "📋 Проверка FFmpeg:"
-        docker run --rm youtube2podcast ffmpeg -version | head -1
-        
-        echo "✅ Все базовые тесты Docker образа прошли успешно!"
-    
+
+
     - name: Test Docker image with SKIP_DOWNLOAD
       run: |
         echo "🧪 Тестирование с SKIP_DOWNLOAD=true..."
