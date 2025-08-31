@@ -186,26 +186,134 @@ def diagnose_video_issue(video_id: str, video_title: str = ""):
         return False
 
 
-def get_videos_from_source(source: Source) -> List[Dict[str, Any]]:
+def get_playlist_info_and_videos(source: Source) -> Dict[str, Any]:
     """
-    Извлекает информацию о видео из источника (плейлист или канал)
+    Получает информацию о плейлисте и его последних видео
     
     Args:
-        source: Конфигурация источника
+        source: Конфигурация источника (плейлист)
         
     Returns:
-        Список словарей с информацией о видео, отсортированный по дате загрузки
+        Словарь с информацией о плейлисте и его видео
     """
     ydl_opts = {
         'quiet': True,
         'extract_flat': False,  # Получаем полную информацию включая даты
         'ignoreerrors': True,  # Пропускаем ошибки для отдельных видео
         'extract_info': True,  # Извлекаем полную информацию
+        'playlist_items': f'1-{source.max_videos}',  # Получаем только первые N видео
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Извлекаем информацию об источнике
+            # Извлекаем информацию о плейлисте
+            playlist_info = ydl.extract_info(source.url, download=False)
+            
+            if not playlist_info:
+                print(f"❌ Не удалось получить информацию о плейлисте: {source.name}")
+                return {}
+            
+            # Информация о плейлисте
+            playlist_data = {
+                'title': playlist_info.get('title', 'Без названия'),
+                'description': playlist_info.get('description', ''),
+                'uploader': playlist_info.get('uploader', 'Неизвестно'),
+                'video_count': playlist_info.get('playlist_count', 0),
+                'last_updated': playlist_info.get('modified_date', ''),
+                'created_date': playlist_info.get('upload_date', ''),
+                'entries': []
+            }
+            
+            print(f"📋 Плейлист: {playlist_data['title']}")
+            print(f"👤 Автор: {playlist_data['uploader']}")
+            print(f"📊 Всего видео: {playlist_data['video_count']}")
+            if playlist_data.get('last_updated'):
+                print(f"🔄 Последнее обновление: {playlist_data['last_updated']}")
+            
+            # Обрабатываем видео в плейлисте
+            if 'entries' in playlist_info and playlist_info['entries']:
+                videos = []
+                for entry in playlist_info['entries']:
+                    if entry:  # Проверяем, что запись не пустая
+                        # Получаем полную информацию о видео
+                        try:
+                            video_url = f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+                            video_info = ydl.extract_info(video_url, download=False)
+                            
+                            if video_info:
+                                video_data = {
+                                    'title': video_info.get('title', 'Без названия'),
+                                    'url': video_info.get('webpage_url', ''),
+                                    'id': video_info.get('id', ''),
+                                    'duration': video_info.get('duration', 0),
+                                    'uploader': video_info.get('uploader', 'Неизвестно'),
+                                    'view_count': video_info.get('view_count', 0),
+                                    'upload_date': video_info.get('upload_date', ''),
+                                    'timestamp': video_info.get('timestamp', 0),
+                                    'playlist_position': entry.get('playlist_index', 0)
+                                }
+                                videos.append(video_data)
+                        except Exception as video_error:
+                            # Если не удалось получить полную информацию, используем базовую
+                            video_data = {
+                                'title': entry.get('title', 'Без названия'),
+                                'url': entry.get('url', ''),
+                                'id': entry.get('id', ''),
+                                'duration': entry.get('duration', 0),
+                                'uploader': entry.get('uploader', 'Неизвестно'),
+                                'view_count': entry.get('view_count', 0),
+                                'upload_date': entry.get('upload_date', ''),
+                                'timestamp': entry.get('timestamp', 0),
+                                'playlist_position': entry.get('playlist_index', 0)
+                            }
+                            videos.append(video_data)
+                
+                # Сортируем видео по дате загрузки (новые сначала)
+                videos.sort(key=lambda x: x.get('timestamp', 0) or x.get('upload_date', ''), reverse=True)
+                playlist_data['entries'] = videos
+                
+                print(f"✅ Найдено {len(videos)} последних видео в плейлисте")
+                if videos:
+                    print(f"📅 Последнее видео: {videos[0]['title']}")
+                    if videos[0].get('upload_date'):
+                        upload_date = videos[0]['upload_date']
+                        formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+                        print(f"📅 Дата загрузки: {formatted_date}")
+            
+            return playlist_data
+            
+    except Exception as e:
+        print(f"❌ Ошибка при извлечении информации о плейлисте {source.name}: {e}")
+        return {}
+
+
+def get_videos_from_source(source: Source) -> List[Dict[str, Any]]:
+    """
+    Извлекает информацию о последних видео из источника (плейлист или канал)
+    
+    Args:
+        source: Конфигурация источника
+        
+    Returns:
+        Список словарей с информацией о последних видео, отсортированный по дате загрузки
+    """
+    # Для плейлистов используем специальную функцию
+    if source.source_type == SourceType.PLAYLIST:
+        playlist_data = get_playlist_info_and_videos(source)
+        return playlist_data.get('entries', [])
+    
+    # Для каналов используем стандартную логику
+    ydl_opts = {
+        'quiet': True,
+        'extract_flat': False,  # Получаем полную информацию включая даты
+        'ignoreerrors': True,  # Пропускаем ошибки для отдельных видео
+        'extract_info': True,  # Извлекаем полную информацию
+        'playlist_items': f'1-{source.max_videos}',  # Получаем только первые N видео
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Извлекаем информацию об источнике (только последние видео)
             source_info = ydl.extract_info(source.url, download=False)
             
             if not source_info or 'entries' not in source_info:
@@ -249,7 +357,7 @@ def get_videos_from_source(source: Source) -> List[Dict[str, Any]]:
             # Сортируем видео по дате загрузки (новые сначала)
             videos.sort(key=lambda x: x.get('timestamp', 0) or x.get('upload_date', ''), reverse=True)
             
-            print(f"✅ Найдено {len(videos)} видео в источнике: {source.name}")
+            print(f"✅ Найдено {len(videos)} последних видео в источнике: {source.name}")
             if videos:
                 print(f"📅 Последнее видео: {videos[0]['title']}")
                 if videos[0].get('upload_date'):
@@ -262,6 +370,95 @@ def get_videos_from_source(source: Source) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"❌ Ошибка при извлечении информации из источника {source.name}: {e}")
         return []
+
+
+def get_latest_video_from_source(source: Source) -> Dict[str, Any]:
+    """
+    Извлекает информацию только о самом последнем видео из источника
+    
+    Args:
+        source: Конфигурация источника
+        
+    Returns:
+        Словарь с информацией о последнем видео или пустой словарь
+    """
+    # Для плейлистов получаем информацию о плейлисте и берем первое видео
+    if source.source_type == SourceType.PLAYLIST:
+        playlist_data = get_playlist_info_and_videos(source)
+        videos = playlist_data.get('entries', [])
+        if videos:
+            latest_video = videos[0]  # Первое видео уже отсортировано по дате
+            print(f"✅ Найдено последнее видео в плейлисте: {source.name}")
+            print(f"📺 Название: {latest_video['title']}")
+            if latest_video.get('upload_date'):
+                upload_date = latest_video['upload_date']
+                formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+                print(f"📅 Дата загрузки: {formatted_date}")
+            return latest_video
+        else:
+            print(f"❌ Не удалось получить последнее видео из плейлиста: {source.name}")
+            return {}
+    
+    # Для каналов используем стандартную логику
+    ydl_opts = {
+        'quiet': True,
+        'extract_flat': False,  # Получаем полную информацию включая даты
+        'ignoreerrors': True,  # Пропускаем ошибки для отдельных видео
+        'extract_info': True,  # Извлекаем полную информацию
+        'playlist_items': '1',  # Получаем только первое видео
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Извлекаем информацию об источнике (только последнее видео)
+            source_info = ydl.extract_info(source.url, download=False)
+            
+            if not source_info or 'entries' not in source_info or not source_info['entries']:
+                print(f"❌ Не удалось получить информацию об источнике: {source.name}")
+                return {}
+            
+            # Берем первое видео (самое последнее)
+            entry = source_info['entries'][0]
+            if not entry:
+                print(f"❌ Не удалось получить последнее видео из источника: {source.name}")
+                return {}
+            
+            # Получаем полную информацию о видео
+            try:
+                video_url = f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+                video_info = ydl.extract_info(video_url, download=False)
+                
+                if video_info:
+                    video_data = {
+                        'title': video_info.get('title', 'Без названия'),
+                        'url': video_info.get('webpage_url', ''),
+                        'id': video_info.get('id', ''),
+                        'duration': video_info.get('duration', 0),
+                        'uploader': video_info.get('uploader', 'Неизвестно'),
+                        'view_count': video_info.get('view_count', 0),
+                        'upload_date': video_info.get('upload_date', ''),
+                        'timestamp': video_info.get('timestamp', 0)
+                    }
+                    
+                    print(f"✅ Найдено последнее видео в источнике: {source.name}")
+                    print(f"📺 Название: {video_data['title']}")
+                    if video_data.get('upload_date'):
+                        upload_date = video_data['upload_date']
+                        formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+                        print(f"📅 Дата загрузки: {formatted_date}")
+                    
+                    return video_data
+                else:
+                    print(f"❌ Не удалось получить информацию о последнем видео: {source.name}")
+                    return {}
+                    
+            except Exception as video_error:
+                print(f"❌ Ошибка при получении информации о последнем видео: {video_error}")
+                return {}
+            
+    except Exception as e:
+        print(f"❌ Ошибка при извлечении информации из источника {source.name}: {e}")
+        return {}
 
 
 def print_video_links(videos: List[Dict[str, Any]], source_name: str) -> None:
@@ -295,6 +492,8 @@ def print_video_links(videos: List[Dict[str, Any]], source_name: str) -> None:
             upload_date = video['upload_date']
             formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
             print(f"    📅 Дата загрузки: {formatted_date}")
+        if video.get('playlist_position'):
+            print(f"    📋 Позиция в плейлисте: {video['playlist_position']}")
         print("-" * 80)
 
 
@@ -303,39 +502,43 @@ def download_latest_audio(videos: List[Dict[str, Any]], source: Source, subscrip
     Загружает аудио из последнего доступного видео
     
     Args:
-        videos: Список всех видео из источника
+        videos: Список всех видео из источника (может быть пустым, если используется get_latest_video_from_source)
         source: Конфигурация источника
         subscription: Конфигурация подписки
         
     Returns:
         Словарь с информацией о загруженном видео или пустой словарь
     """
+    # Если videos пустой, получаем только последнее видео
     if not videos:
-        print(f"❌ Нет видео для загрузки в источнике: {source.name}")
-        return {}
-    
-    # Ищем первое доступное видео среди последних N
-    latest_video = None
-    max_check = min(source.max_videos, len(videos))
-    
-    for i, video in enumerate(videos[:max_check]):
-        print(f"Проверяю доступность видео {i+1}: {video['title']}")
+        print(f"📡 Получаем только последнее видео из источника: {source.name}")
+        latest_video = get_latest_video_from_source(source)
+        if not latest_video:
+            print(f"❌ Не удалось получить последнее видео из источника: {source.name}")
+            return {}
+    else:
+        # Ищем первое доступное видео среди последних N
+        latest_video = None
+        max_check = min(source.max_videos, len(videos))
         
-        # Проверяем доступность видео
-        if check_video_availability(video['id']):
-            latest_video = video
-            print(f"✅ Видео доступно: {video['title']}")
-            break
-        else:
-            print(f"❌ Видео недоступно: {video['title']}")
-            # Если это последнее видео и оно недоступно, запускаем подробную диагностику
-            if i == max_check - 1:
-                print(f"\n🔍 Запускаем подробную диагностику последнего видео...")
-                diagnose_video_issue(video['id'], video['title'])
-    
-    if not latest_video:
-        print(f"❌ Не найдено доступных видео для загрузки в источнике: {source.name}")
-        return {}
+        for i, video in enumerate(videos[:max_check]):
+            print(f"Проверяю доступность видео {i+1}: {video['title']}")
+            
+            # Проверяем доступность видео
+            if check_video_availability(video['id']):
+                latest_video = video
+                print(f"✅ Видео доступно: {video['title']}")
+                break
+            else:
+                print(f"❌ Видео недоступно: {video['title']}")
+                # Если это последнее видео и оно недоступно, запускаем подробную диагностику
+                if i == max_check - 1:
+                    print(f"\n🔍 Запускаем подробную диагностику последнего видео...")
+                    diagnose_video_issue(video['id'], video['title'])
+        
+        if not latest_video:
+            print(f"❌ Не найдено доступных видео для загрузки в источнике: {source.name}")
+            return {}
     
     # Создаем папку для подписки
     subscription_dir = f"data/{subscription.name}"
@@ -572,8 +775,9 @@ def process_source(source: Source, subscription: Subscription) -> bool:
             print(f"❌ Не удалось получить видео из источника: {source.name}")
             return False
         
-        # Выводим информацию о видео
-        print_video_links(videos, source.name)
+        # Выводим информацию о видео (если есть)
+        if videos:
+            print_video_links(videos, source.name)
         
         # Загружаем аудио из последнего видео
         latest_video = download_latest_audio(videos, source, subscription)
