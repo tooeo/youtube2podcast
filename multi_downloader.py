@@ -554,6 +554,10 @@ def download_latest_audio(videos: List[Dict[str, Any]], source: Source, subscrip
     Returns:
         Словарь с информацией о загруженном видео или пустой словарь
     """
+    # Проверяем переменную окружения для предотвращения загрузки в тестах
+    if os.environ.get('SKIP_DOWNLOAD', 'false').lower() in ('true', '1', 'yes'):
+        print(f"🚫 Загрузка пропущена (SKIP_DOWNLOAD=true) для источника: {source.name}")
+        return {}
     # Если videos пустой, получаем только последнее видео
     if not videos:
         print(f"📡 Получаем только последнее видео из источника: {source.name}")
@@ -844,6 +848,11 @@ def process_source(source: Source, subscription: Subscription) -> bool:
     print("-" * 50)
     
     try:
+        # Проверяем переменную окружения для предотвращения загрузки в тестах
+        if os.environ.get('SKIP_DOWNLOAD', 'false').lower() in ('true', '1', 'yes'):
+            print(f"🚫 Обработка пропущена (SKIP_DOWNLOAD=true) для источника: {source.name}")
+            return True
+        
         # Если включен dry-run режим, выполняем анализ
         if dry_run:
             analysis_result = dry_run_analysis(source, subscription)
