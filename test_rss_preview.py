@@ -8,14 +8,29 @@ import sys
 import os
 import xml.etree.ElementTree as ET
 
-# Регистрируем namespace для iTunes глобально
-ET.register_namespace('itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
-
 # Добавляем корневую директорию в путь для импорта
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import Source, SourceType, Subscription
 from multi_downloader import create_or_update_rss, get_file_hash
+
+
+def safe_parse_xml(file_path):
+    """Безопасно парсит XML файл с поддержкой namespace"""
+    # Регистрируем namespace для iTunes
+    ET.register_namespace('itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
+    
+    # Читаем файл как текст
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Создаем парсер с поддержкой namespace
+    parser = ET.XMLParser(target=ET.TreeBuilder())
+    root = ET.fromstring(content, parser=parser)
+    
+    # Создаем ElementTree
+    tree = ET.ElementTree(root)
+    return tree
 
 
 def test_rss_with_preview():
@@ -97,7 +112,7 @@ def test_rss_with_preview():
         print(f"✅ RSS файл создан: {rss_file}")
         
         # Парсим и проверяем RSS
-        tree = ET.parse(rss_file)
+        tree = safe_parse_xml(rss_file)
         root = tree.getroot()
         
         # Проверяем превью канала
@@ -148,7 +163,7 @@ def validate_rss_structure():
         return
     
     try:
-        tree = ET.parse(rss_file)
+        tree = safe_parse_xml(rss_file)
         root = tree.getroot()
         
         # Проверяем обязательные элементы
