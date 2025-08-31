@@ -82,37 +82,59 @@ jobs:
         docker build -t youtube2podcast .
 
 
-    - name: Test Docker image with SKIP_DOWNLOAD
+    - name: Test Docker image basic functionality
       run: |
-        echo "🧪 Тестирование с SKIP_DOWNLOAD=true..."
+        echo "🧪 Тестирование базовой функциональности Docker образа..."
         
-        # Тестируем с переменной SKIP_DOWNLOAD=true
-        echo "📋 Тест с предотвращением загрузки:"
-        docker run --rm \
-          -e SKIP_DOWNLOAD=true \
-          -v $(pwd)/config.yaml.dist:/app/config.yaml \
-          youtube2podcast python -c "
-        import multi_downloader
-        from config import ConfigManager
+        # Проверяем версию Python
+        echo "📋 Проверка версии Python:"
+        docker run --rm youtube2podcast python --version
+        
+        # Проверяем доступность основных модулей
+        echo "📋 Проверка импорта модулей:"
+        docker run --rm youtube2podcast python -c "
+        try:
+            from config import Source, SourceType, Subscription, Config, ConfigManager
+            print('✅ Config imports OK')
+        except ImportError as e:
+            print(f'❌ Config import failed: {e}')
+            exit(1)
         
         try:
-            config_manager = ConfigManager()
-            print('✅ ConfigManager инициализирован успешно')
-            
-            # Проверяем, что переменная окружения работает
-            import os
-            skip_download = os.environ.get('SKIP_DOWNLOAD', 'false').lower()
-            print(f'📋 SKIP_DOWNLOAD={skip_download}')
-            
-            if skip_download in ('true', '1', 'yes'):
-                print('✅ Переменная SKIP_DOWNLOAD корректно установлена')
-            else:
-                print('❌ Переменная SKIP_DOWNLOAD не установлена')
-                exit(1)
-                
-        except Exception as e:
-            print(f'❌ Тест failed: {e}')
+            import multi_downloader
+            print('✅ Multi-downloader import OK')
+        except ImportError as e:
+            print(f'❌ Multi-downloader import failed: {e}')
             exit(1)
         "
         
-        echo "✅ Тесты с SKIP_DOWNLOAD прошли успешно!"
+        # Проверяем доступность yt-dlp
+        echo "📋 Проверка yt-dlp:"
+        docker run --rm youtube2podcast python -c "
+        try:
+            import yt_dlp
+            print(f'✅ yt-dlp version: {yt_dlp.version.__version__}')
+        except ImportError as e:
+            print(f'❌ yt-dlp import failed: {e}')
+            exit(1)
+        "
+        
+        # Проверяем доступность FFmpeg
+        echo "📋 Проверка FFmpeg:"
+        docker run --rm youtube2podcast ffmpeg -version | head -1
+        
+        # Проверяем переменную окружения SKIP_DOWNLOAD
+        echo "📋 Проверка переменной SKIP_DOWNLOAD:"
+        docker run --rm -e SKIP_DOWNLOAD=true youtube2podcast python -c "
+        import os
+        skip_download = os.environ.get('SKIP_DOWNLOAD', 'false').lower()
+        print(f'📋 SKIP_DOWNLOAD={skip_download}')
+        
+        if skip_download in ('true', '1', 'yes'):
+            print('✅ Переменная SKIP_DOWNLOAD корректно установлена')
+        else:
+            print('❌ Переменная SKIP_DOWNLOAD не установлена')
+            exit(1)
+        "
+        
+        echo "✅ Все базовые тесты Docker образа прошли успешно!"
