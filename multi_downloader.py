@@ -194,12 +194,13 @@ def get_videos_from_source(source: Source) -> List[Dict[str, Any]]:
         source: Конфигурация источника
         
     Returns:
-        Список словарей с информацией о видео
+        Список словарей с информацией о видео, отсортированный по дате загрузки
     """
     ydl_opts = {
         'quiet': True,
-        'extract_flat': True,  # Извлекаем только метаданные, без скачивания
+        'extract_flat': False,  # Получаем полную информацию включая даты
         'ignoreerrors': True,  # Пропускаем ошибки для отдельных видео
+        'extract_info': True,  # Извлекаем полную информацию
     }
     
     try:
@@ -214,17 +215,48 @@ def get_videos_from_source(source: Source) -> List[Dict[str, Any]]:
             videos = []
             for entry in source_info['entries']:
                 if entry:  # Проверяем, что запись не пустая
-                    video_info = {
-                        'title': entry.get('title', 'Без названия'),
-                        'url': entry.get('url', ''),
-                        'id': entry.get('id', ''),
-                        'duration': entry.get('duration', 0),
-                        'uploader': entry.get('uploader', 'Неизвестно'),
-                        'view_count': entry.get('view_count', 0)
-                    }
-                    videos.append(video_info)
+                    # Получаем полную информацию о видео
+                    try:
+                        video_url = f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+                        video_info = ydl.extract_info(video_url, download=False)
+                        
+                        if video_info:
+                            video_data = {
+                                'title': video_info.get('title', 'Без названия'),
+                                'url': video_info.get('webpage_url', ''),
+                                'id': video_info.get('id', ''),
+                                'duration': video_info.get('duration', 0),
+                                'uploader': video_info.get('uploader', 'Неизвестно'),
+                                'view_count': video_info.get('view_count', 0),
+                                'upload_date': video_info.get('upload_date', ''),
+                                'timestamp': video_info.get('timestamp', 0)
+                            }
+                            videos.append(video_data)
+                    except Exception as video_error:
+                        # Если не удалось получить полную информацию, используем базовую
+                        video_data = {
+                            'title': entry.get('title', 'Без названия'),
+                            'url': entry.get('url', ''),
+                            'id': entry.get('id', ''),
+                            'duration': entry.get('duration', 0),
+                            'uploader': entry.get('uploader', 'Неизвестно'),
+                            'view_count': entry.get('view_count', 0),
+                            'upload_date': entry.get('upload_date', ''),
+                            'timestamp': entry.get('timestamp', 0)
+                        }
+                        videos.append(video_data)
+            
+            # Сортируем видео по дате загрузки (новые сначала)
+            videos.sort(key=lambda x: x.get('timestamp', 0) or x.get('upload_date', ''), reverse=True)
             
             print(f"✅ Найдено {len(videos)} видео в источнике: {source.name}")
+            if videos:
+                print(f"📅 Последнее видео: {videos[0]['title']}")
+                if videos[0].get('upload_date'):
+                    upload_date = videos[0]['upload_date']
+                    formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+                    print(f"📅 Дата загрузки: {formatted_date}")
+            
             return videos
             
     except Exception as e:
@@ -259,6 +291,10 @@ def print_video_links(videos: List[Dict[str, Any]], source_name: str) -> None:
             print(f"    Просмотров: {video['view_count']:,}")
         else:
             print(f"    Просмотров: Недоступно")
+        if video.get('upload_date'):
+            upload_date = video['upload_date']
+            formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+            print(f"    📅 Дата загрузки: {formatted_date}")
         print("-" * 80)
 
 
