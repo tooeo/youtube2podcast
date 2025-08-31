@@ -1,4 +1,4 @@
-name: Test and CI
+name: Test and CI v2
 
 on:
   push:
@@ -17,12 +17,24 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Clear GitHub Actions cache
+      run: |
+        echo "Clearing any cached Python versions..."
+        rm -rf ~/.cache/pip || true
+        rm -rf ~/.local/lib/python* || true
+    
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
         check-latest: true
         cache: 'pip'
+    
+    - name: Debug Python version
+      run: |
+        echo "Requested Python version: ${{ matrix.python-version }}"
+        python --version
+        which python
     
     - name: Clear Python cache
       run: |
